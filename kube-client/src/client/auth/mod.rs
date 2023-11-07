@@ -10,7 +10,8 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_lib::select as jsonpath_select;
+// use jsonpath_lib::select as jsonpath_select;
+use jsonpath_rust::select as jsonpath_select;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
