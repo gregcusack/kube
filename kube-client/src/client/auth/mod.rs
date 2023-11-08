@@ -11,6 +11,7 @@ use http::{
     HeaderValue, Request,
 };
 use jsonpath_lib::select as jsonpath_select;
+use jsonpath_rust::JsonPathFinder as jsonpath_finder;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -476,21 +477,33 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 
 fn extract_value(json: &serde_json::Value, path: &str) -> Result<String, Error> {
     let pure_path = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
-    match jsonpath_select(json, &format!("${pure_path}")) {
-        Ok(v) if !v.is_empty() => {
-            if let serde_json::Value::String(res) = v[0] {
-                Ok(res.clone())
-            } else {
-                Err(Error::AuthExec(format!(
-                    "Target value at {pure_path:} is not a string"
-                )))
-            }
-        }
+    
+    let json_str = json.as_str().unwrap();
+    let jsonpath = jsonpath_finder::from_str(json_str, pure_path).unwrap();
+    let res = serde_json::Value::Array(
+        jsonpath.find_slice()
+            .into_iter()
+            .filter(|v| v.has_value())
+            .map(|v| v.to_data())
+            .collect()
+    );
+    Ok(res.to_string())
 
-        Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
+    // match jsonpath_select(json, &format!("${pure_path}")) {
+    //     Ok(v) if !v.is_empty() => {
+    //         if let serde_json::Value::String(res) = v[0] {
+    //             Ok(res.clone())
+    //         } else {
+    //             Err(Error::AuthExec(format!(
+    //                 "Target value at {pure_path:} is not a string"
+    //             )))
+    //         }
+    //     }
 
-        _ => Err(Error::AuthExec(format!("Target value {pure_path:} not found"))),
-    }
+    //     Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
+
+    //     _ => Err(Error::AuthExec(format!("Target value {pure_path:} not found"))),
+    // }
 }
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
