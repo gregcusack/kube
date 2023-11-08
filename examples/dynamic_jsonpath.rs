@@ -26,6 +26,21 @@ async fn main() -> anyhow::Result<()> {
     // Use the given JSONPATH to filter the ObjectList
     let list_json = serde_json::to_value(&list)?;
     let res = jsonpath_lib::select(&list_json, &jsonpath).unwrap();
-    info!("\t\t {:?}", res);
+    info!("greg 1 res: \t\t {:?}", res);
+
+    let json_str = list_json.to_string();
+    let jsonpath = jsonpath_rust::JsonPathFinder::from_str(json_str.as_str(), jsonpath.as_str()).unwrap();
+    let val: Vec<serde_json::Value> = jsonpath.find_slice()
+            .into_iter()
+            .filter(|v| v.has_value())
+            .map(|v| v.to_data())
+            .collect();
+    info!("greg 1 val: \t\t {:?}", val);
+
+    let val2: Vec<&serde_json::Value> = val.iter().map(|s| s).collect();
+
+    assert_eq!(res, val2);
+
+
     Ok(())
 }

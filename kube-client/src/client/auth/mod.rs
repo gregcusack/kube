@@ -478,16 +478,22 @@ fn token_from_gcp_provider(provider: &AuthProviderConfig) -> Result<ProviderToke
 fn extract_value(json: &serde_json::Value, path: &str) -> Result<String, Error> {
     let pure_path = path.trim_matches(|c| c == '"' || c == '{' || c == '}');
     
-    let json_str = json.as_str().unwrap();
-    let jsonpath = jsonpath_finder::from_str(json_str, pure_path).unwrap();
-    let res = serde_json::Value::Array(
-        jsonpath.find_slice()
-            .into_iter()
-            .filter(|v| v.has_value())
-            .map(|v| v.to_data())
-            .collect()
-    );
-    Ok(res.to_string())
+    let json_str = json.to_string();
+    match jsonpath_finder::from_str(json_str.as_str(), pure_path) {
+        Ok(jsonpath) => {
+            let res = serde_json::Value::Array(
+                jsonpath.find_slice()
+                    .into_iter()
+                    .filter(|v| v.has_value())
+                    .map(|v| v.to_data())
+                    .collect()
+            );
+            Ok(res.to_string())
+        },
+        Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
+    }
+    // let jsonpath = jsonpath_finder::from_str(json_str.as_str(), pure_path).unwrap();
+    
 
     // match jsonpath_select(json, &format!("${pure_path}")) {
     //     Ok(v) if !v.is_empty() => {
