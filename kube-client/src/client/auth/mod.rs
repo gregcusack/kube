@@ -10,7 +10,6 @@ use http::{
     header::{InvalidHeaderValue, AUTHORIZATION},
     HeaderValue, Request,
 };
-use jsonpath_lib::select as jsonpath_select;
 use jsonpath_rust::JsonPathFinder as jsonpath_finder;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
@@ -481,35 +480,26 @@ fn extract_value(json: &serde_json::Value, path: &str) -> Result<String, Error> 
     let json_str = json.to_string();
     match jsonpath_finder::from_str(json_str.as_str(), pure_path) {
         Ok(jsonpath) => {
-            let res = serde_json::Value::Array(
+            let res: Vec<serde_json::Value> = 
                 jsonpath.find_slice()
                     .into_iter()
                     .filter(|v| v.has_value())
                     .map(|v| v.to_data())
-                    .collect()
-            );
-            Ok(res.to_string())
+                    .collect();
+            if !res.is_empty() {
+                if let serde_json::Value::String(val) = &res[0] {
+                    Ok(val.clone())
+                } else {
+                    Err(Error::AuthExec(format!(
+                        "Target value at {pure_path:} is not a string"
+                    )))
+                }
+            } else {
+                Err(Error::AuthExec(format!("Target value {pure_path:} not found")))
+            }
         },
         Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
-    }
-    // let jsonpath = jsonpath_finder::from_str(json_str.as_str(), pure_path).unwrap();
-    
-
-    // match jsonpath_select(json, &format!("${pure_path}")) {
-    //     Ok(v) if !v.is_empty() => {
-    //         if let serde_json::Value::String(res) = v[0] {
-    //             Ok(res.clone())
-    //         } else {
-    //             Err(Error::AuthExec(format!(
-    //                 "Target value at {pure_path:} is not a string"
-    //             )))
-    //         }
-    //     }
-
-    //     Err(e) => Err(Error::AuthExec(format!("Could not extract JSON value: {e:}"))),
-
-    //     _ => Err(Error::AuthExec(format!("Target value {pure_path:} not found"))),
-    // }
+    }    
 }
 
 /// ExecCredentials is used by exec-based plugins to communicate credentials to
